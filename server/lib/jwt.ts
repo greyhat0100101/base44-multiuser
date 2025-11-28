@@ -1,18 +1,23 @@
-import { create, verify } from "https://deno.land/x/djwt@v2.8/mod.ts";
+// server/lib/jwt.ts
+import { create, verify, getNumericDate } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
-const JWT_SECRET = Deno.env.get("JWT_SECRET")!;
-const key = await crypto.subtle.importKey(
-  "raw",
-  new TextEncoder().encode(JWT_SECRET),
-  { name: "HMAC", hash: "SHA-256" },
-  true,
-  ["sign", "verify"],
-);
+const JWT_SECRET = Deno.env.get("JWT_SECRET") || "defaultsecret";
 
-export function signJWT(payload) {
-  return create({ alg: "HS256", typ: "JWT" }, payload, key);
+export function createToken(user_id: string) {
+  return create(
+    { alg: "HS256", typ: "JWT" },
+    {
+      user_id,
+      exp: getNumericDate(60 * 60 * 24 * 7), // 7 días
+    },
+    JWT_SECRET,
+  );
 }
 
-export async function verifyJWT(jwt) {
-  return verify(jwt, key);
+export function verifyToken(token: string) {
+  try {
+    return verify(token, JWT_SECRET, "HS256");
+  } catch (_e) {
+    return null;
+  }
 }
