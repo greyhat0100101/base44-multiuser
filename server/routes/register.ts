@@ -1,30 +1,57 @@
+// server/routes/register.ts
 import { supabase } from "../lib/db.ts";
 import { encrypt } from "../lib/crypto.ts";
-import { signJWT } from "../lib/jwt.ts";
+import { createToken } from "../lib/jwt.ts";
 
-export async function register(req) {
-  const body = await req.json();
-  const { email, paypal_client_id, paypal_client_secret, base44_api_key } = body;
+export async function register(req: Request) {
+  try {
+    const body = await req.json();
 
-  if (!email || !paypal_client_id || !paypal_client_secret)
-    return Response.json({ error: "Missing fields" }, { status: 400 });
-
-  const encryptedSecret = await encrypt(paypal_client_secret);
-  const encryptedB44 = base44_api_key ? await encrypt(base44_api_key) : null;
-
-  const { data, error } = await supabase
-    .from("users")
-    .insert({
+    const {
       email,
+      paypal_mode = "sandbox",
       paypal_client_id,
-      paypal_client_secret: encryptedSecret,
-      base44_api_key: encryptedB44,
-    })
-    .select()
-    .single();
+      paypal_client_secret,
+      base44_api_key,
+    } = body;
 
-  if (error) return Response.json({ error }, { status: 500 });
+    if (!email || !paypal_client_id || !paypal_client_secret || !base44_api_key) {
+      return Response.json(
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
+    }
 
-  const jwt = await signJWT({ user_id: data.id });
-  return Response.json({ success: true, token: jwt });
+    if (paypal_mode !== "sandbox" && paypal_mode !== "live") {
+      return Response.json(
+        { error: "paypal_mode must be 'sandbox' or 'live'" },
+        { status: 400 },
+      );
+    }
+
+    // Encrypt credentials before saving
+    const encrypted_client_id = encrypt(paypal_client_id);
+    const encrypted_client_secret = encrypt(paypal_client_secret);
+    const encrypted_api_key = encrypt(base44_api_key);
+
+    const { data, error } = await supabase.from("users").insert({
+      email,
+      paypal_mode,
+      paypal_client_id: encrypted_client_id,
+      paypal_client_secret: encrypted_client_secret,
+      base44_api_key: encrypted_api_key,
+    }).select("*").single();
+
+    if (error) {
+      return Response.json({ error }, { status: 500 });
+    }
+
+    const token = createToken(data.id);
+
+    return Response.json({ success: true, token });
+  } catch (err) {
+    return Response.json({ error: err.message || "Unknown error" }, {
+      status: 500,
+    });
+  }
 }
