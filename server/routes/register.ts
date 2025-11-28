@@ -34,24 +34,29 @@ export async function register(req: Request) {
     const encrypted_client_secret = encrypt(paypal_client_secret);
     const encrypted_api_key = encrypt(base44_api_key);
 
-    const { data, error } = await supabase.from("users").insert({
-      email,
-      paypal_mode,
-      paypal_client_id: encrypted_client_id,
-      paypal_client_secret: encrypted_client_secret,
-      base44_api_key: encrypted_api_key,
-    }).select("*").single();
+    const { data, error } = await supabase.from("users")
+      .insert({
+        email,
+        paypal_mode,
+        paypal_client_id: encrypted_client_id,
+        paypal_client_secret: encrypted_client_secret,
+        base44_api_key: encrypted_api_key,
+      })
+      .select("*")
+      .single();
 
     if (error) {
       return Response.json({ error }, { status: 500 });
     }
 
-    const token = createToken(data.id);
+    // FIX: await token creation
+    const token = await createToken(data.id);
 
     return Response.json({ success: true, token });
   } catch (err) {
-    return Response.json({ error: err.message || "Unknown error" }, {
-      status: 500,
-    });
+    return Response.json(
+      { error: err.message || "Unknown error" },
+      { status: 500 },
+    );
   }
 }
