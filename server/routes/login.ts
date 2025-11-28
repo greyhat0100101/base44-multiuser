@@ -1,18 +1,34 @@
+// server/routes/login.ts
 import { supabase } from "../lib/db.ts";
-import { signJWT } from "../lib/jwt.ts";
+import { createToken } from "../lib/jwt.ts";
 
-export async function login(req) {
-  const body = await req.json();
-  const { email } = body;
+export async function login(req: Request) {
+  try {
+    const body = await req.json();
+    const { email } = body;
 
-  const { data } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", email)
-    .single();
+    if (!email) {
+      return Response.json({ error: "Missing email" }, { status: 400 });
+    }
 
-  if (!data) return Response.json({ error: "User not found" }, { status: 404 });
+    // Look up the user
+    const { data, error } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
 
-  const jwt = await signJWT({ user_id: data.id });
-  return Response.json({ token: jwt });
+    if (error || !data) {
+      return Response.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Create JWT token
+    const token = createToken(data.id);
+
+    return Response.json({ success: true, token });
+  } catch (err) {
+    return Response.json({ error: err.message || "Unknown login error" }, {
+      status: 500,
+    });
+  }
 }
