@@ -22,8 +22,8 @@ export async function login(req: Request) {
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Create JWT token
-    const token = createToken(data.id);
+    // Create JWT token (FIX: add await)
+    const token = await createToken(data.id);
 
     return Response.json({ success: true, token });
   } catch (err) {
